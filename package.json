@@ -1,0 +1,13 @@
+{
+  "name": "playbridge",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/core", "packages/web", "packages/testing", "packages/facebook", "packages/crazygames"],
+  "scripts": {
+    "build": "npm run build -w @playbridge/core && npm run build -w @playbridge/web && npm run build -w @playbridge/testing && npm run build -w @playbridge/facebook && npm run build -w @playbridge/crazygames",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "typescript": "5.5.2"
+  }
+}
