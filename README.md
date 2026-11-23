@@ -33,4 +33,41 @@ Penguin Pop Party resolves the packages from a sibling checkout named `playbridg
 
 Call `lifecycle.initialize()` before using host APIs. Read capabilities when composing a game flow and handle each optional operation's result at the call site. Report loading around actual content preload, and report gameplay only when the game accepts input or enters a break. The CrazyGames adapter deduplicates state changes. Browser blur and visibility still belong to the game shell.
 
+Use `analytics.setConsent(allowed)` after the game loads or saves its choice. Call `track(name)` for a bare event or `track(name, { value, properties })` to supply a finite numeric value and up to 16 string, finite number, or boolean properties. Names and keys use 1–40 ASCII letters, digits and underscores, starting with a letter. Property strings are limited to 100 characters. The game owns the event schema and omits private data.
+
+The Facebook adapter forwards consented events to `FBInstant.logEvent` and converts scalar properties to strings. A successful call signals SDK acceptance. An SDK error return or exception yields `failed`. CrazyGames provides host loading and gameplay events through lifecycle, and reports custom analytics as unsupported. Web also reports custom analytics as unsupported. The test adapter captures consented events in memory.
+
 When checkout reports `completed`, the provider returned a matching receipt. When it reports `pending`, the result may still settle. Both paths can consult inventory before activating a durable entitlement. The caller owns entitlement policy and player-facing copy. [Meta Instant Games lifecycle](https://developers.facebook.com/docs/games/instant-games/guides/lifecycle/)
+
+## Localization
+
+Import `Localization` from `@playbridge/core`. Each game supplies its supported language tags, default language and translation lookup. Initialize one instance per game. Pass the device or browser language preferences in priority order and optionally provide a game-scoped preference store.
+
+```ts
+import { Localization } from '@playbridge/core';
+import { scopedBrowserStorage } from '@playbridge/web';
+
+const french: Readonly<Record<string, string>> = { Play: 'Jouer' };
+const locale = new Localization({
+  languages: { en: { formatLocale: 'en-US' }, fr: {} },
+  fallbackLanguage: 'en',
+  preferredLocales: navigator.languages,
+  preferenceStore: {
+    storage: scopedBrowserStorage('example.web.', () => window.localStorage),
+    key: 'language',
+  },
+  translate: (language, message) => language === 'fr' ? french[message] : undefined,
+});
+
+// For a hosted build, pass the host locale after the SDK is ready.
+await platform.lifecycle.initialize();
+locale.setPlatformLocale(platform.locale?.());
+
+locale.text('Play');
+locale.number(1234567);
+```
+
+- The saved choice overrides automatic detection. Call `select('automatic')` to return to detection. If storage is blocked, selections still apply for the current visit.
+- Automatic detection tries the SDK locale, the preferred device or browser languages, then the game's default. Use `setPlatformLocale(value, 'default')` when the host requires skipping the device or browser fallback. Supported regional locales retain their region for formatting.
+- `text(source, values)` tries the active catalog, the default catalog, then the source string. Provide named placeholders such as `{name}` for interpolation. `number(value)` uses localized grouping and `digits(value)` omits it. Set `direction: 'rtl'` on languages that need right-to-left layout and use `locale.rtl` in the renderer.
+- The game supplies its picker, language labels, fonts and flags. After a selection, render the current screen again with the same game state.

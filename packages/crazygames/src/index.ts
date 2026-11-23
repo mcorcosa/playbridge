@@ -16,6 +16,7 @@ export interface CrazyGamesSdk {
   init(): Promise<void>;
   readonly environment?: string;
   readonly game?: CrazyGamesGame;
+  readonly user?: { readonly systemInfo?: { readonly locale?: string } };
 }
 
 export interface CrazyGamesOptions {
@@ -33,6 +34,7 @@ export function createCrazyGamesPlatform(options: CrazyGamesOptions): PlatformSe
   let initialization: Promise<void> | undefined;
   let loading: ((active: boolean) => void) | undefined;
   let gameplay: ((active: boolean) => void) | undefined;
+  let initializedSdk: CrazyGamesSdk | undefined;
 
   async function initializeSdk(): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -52,6 +54,7 @@ export function createCrazyGamesPlatform(options: CrazyGamesOptions): PlatformSe
 
       const environment = sdk.environment;
       if (environment !== "local" && environment !== "crazygames") return;
+      initializedSdk = sdk;
 
       const game = sdk.game;
       if (!game) return;
@@ -98,6 +101,10 @@ export function createCrazyGamesPlatform(options: CrazyGamesOptions): PlatformSe
   const basic = unsupportedServices(lifecycle, options.persistence);
   return {
     ...basic,
+    locale() {
+      try { return initializedSdk?.user?.systemInfo?.locale; }
+      catch { return undefined; }
+    },
     capabilities: () => ({
       ...basic.capabilities(),
       hostLoading: loading ? "available" : options.getSdk ? "unavailable" : "unsupported",

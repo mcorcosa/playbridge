@@ -1,4 +1,4 @@
-import { PlatformError, unsupportedServices, type Availability, type Lifecycle, type Logger, type PlatformServices } from '@playbridge/core';
+import { PlatformError, unsupportedServices, validAnalyticsEvent, type Availability, type Lifecycle, type Logger, type PlatformServices } from '@playbridge/core';
 import { createFacebookAds, type FacebookAdSdk } from './ads.js';
 import { createFacebookLeaderboards, type FacebookLeaderboard } from './leaderboards.js';
 import { createFacebookPurchases, type FacebookPayments } from './purchases.js';
@@ -14,8 +14,9 @@ export interface FacebookSDK extends FacebookAdSdk {
   startGameAsync(): Promise<void>;
   setLoadingProgress(progress: number): void;
   getSupportedAPIs?(): string[];
+  getLocale?(): string;
   onPause(callback: () => void): void;
-  logEvent(name: string): unknown;
+  logEvent?(name: string, valueToSum?: number, parameters?: Record<string, string>): unknown;
   player: {
     getID?(): string | null;
     getDataAsync(keys: string[]): Promise<Record<string, unknown>>;
@@ -48,6 +49,7 @@ export function createFacebookPlatform({
   let supported = new Set<string>();
   let consent = false;
   let initialized: Promise<void> | undefined;
+  let localeSdk: FacebookSDK | undefined;
   let started: Promise<void> | undefined;
   const pauses = new Set<() => void>();
   const supports = (name: string) => supported.size === 0 || supported.has(name.replace(/^FBInstant\./, ''));
@@ -68,6 +70,7 @@ export function createFacebookPlatform({
         supported = new Set((sdk.getSupportedAPIs?.() ?? []).map(name => name.replace(/^FBInstant\./, '')));
         sdk.onPause(() => { for (const callback of pauses) callback(); });
         lifecycle.loading({ phase: 'finish' });
+        localeSdk = sdk;
       })().catch(error => { initialized = undefined; throw error; });
     },
     start() {
@@ -104,6 +107,10 @@ export function createFacebookPlatform({
   return {
     ...fallback,
     supports, ads, purchases, leaderboards,
+    locale() {
+      try { return supports('getLocale') ? localeSdk?.getLocale?.() : undefined; }
+      catch { return undefined; }
+    },
     capabilities() {
       const sdk = getSDK();
       return {
@@ -127,14 +134,20 @@ export function createFacebookPlatform({
     },
     analytics: {
       setConsent(allowed) { consent = allowed; },
-      track(event) {
+      track(event, details) {
         if (!supports('logEvent')) return { status: 'unsupported' };
         const sdk = getSDK();
         if (!consent || !sdk) return { status: 'unavailable' };
         if (typeof sdk.logEvent !== 'function') return { status: 'unsupported' };
         try {
-          sdk.logEvent(event);
-          return { status: 'completed', value: undefined };
+          if (!validAnalyticsEvent(event, details)) return { status: 'failed' };
+          const properties = details?.properties && Object.fromEntries(
+            Object.entries(details.properties).map(([key, value]) => [key, String(value)]),
+          );
+          const result = properties === undefined && details?.value === undefined
+            ? sdk.logEvent(event) : sdk.logEvent(event, details?.value, properties);
+          if (result === null || result === undefined) return { status: 'completed', value: undefined };
+          return { status: 'failed', ...(result && typeof result === 'object' ? { error: result } : {}) };
         } catch (error) {
           log?.('facebook.analytics.failed', error);
           return { status: 'failed', error };

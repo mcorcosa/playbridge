@@ -87,7 +87,25 @@ export class PlatformError extends Error {
   }
 }
 
+export type AnalyticsScalar = string | number | boolean;
+export interface AnalyticsDetails {
+  readonly value?: number;
+  readonly properties?: Readonly<Record<string, AnalyticsScalar>>;
+}
+
+/** Keep custom analytics portable across providers. Names and keys use up to 40 ASCII characters. */
+export function validAnalyticsEvent(name: string, details?: AnalyticsDetails): boolean {
+  const identifier = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
+  if (typeof name !== 'string' || !identifier.test(name) || (details?.value !== undefined && !Number.isFinite(details.value))) return false;
+  const entries = Object.entries(details?.properties ?? {});
+  return entries.length <= 16 && entries.every(([key, value]) => identifier.test(key) &&
+    (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value)) ||
+      (typeof value === 'string' && value.length <= 100)));
+}
+
 export interface PlatformServices {
+  /** Best-effort host locale once its SDK has initialized. */
+  locale?(): string | undefined;
   capabilities(): Capabilities;
   lifecycle: Lifecycle;
   persistence: Persistence;
@@ -96,7 +114,7 @@ export interface PlatformServices {
   purchases: Purchases;
   leaderboards: Leaderboards;
   share(text: string): Promise<Outcome>;
-  analytics: { setConsent(allowed: boolean): void; track(event: string): Outcome };
+  analytics: { setConsent(allowed: boolean): void; track(event: string, details?: AnalyticsDetails): Outcome };
 }
 
 const noOperation = async (): Promise<{ status: 'unsupported' }> => ({ status: 'unsupported' });
@@ -119,3 +137,4 @@ export function unsupportedServices(lifecycle: Lifecycle, persistence: Persisten
     analytics: { setConsent() {}, track: () => ({ status: 'unsupported' }) },
   };
 }
+export { Localization, type LanguagePreference, type LanguageSettings, type LocaleStorage, type LocalizationOptions, type MessageValues } from './localization.js';
