@@ -1,6 +1,13 @@
 import { Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from 'pixi.js';
 import 'pixi.js/events';
 
+/** Returns a text rasterization tier for the renderer and the text's display scale. */
+export function pixiTextResolution(rendererResolution: number, displayScale = 1): number {
+  const resolution = Number.isFinite(rendererResolution) && rendererResolution > 0 ? rendererResolution : 1;
+  const scale = Number.isFinite(displayScale) && displayScale > 0 ? displayScale : 1;
+  return Math.min(4, Math.max(1, Math.ceil(resolution * scale)));
+}
+
 export interface PixiGameMenuLabels {
   menu: string;
   sound: string;
@@ -91,6 +98,8 @@ export class PixiGameMenu {
   private readonly resumeButton: Button;
   private readonly modalSoundButton: Button;
   private readonly soundState: Text;
+  private readonly textLabels: readonly Text[];
+  private textResolution: number | undefined;
   private readonly presses = new Map<number, Button>();
   private focused: Button | undefined;
   private showFocus = false;
@@ -120,6 +129,7 @@ export class PixiGameMenu {
     const resume = this.createText(labels.resume, 18, '600', 120, 22);
     const sound = this.createText(labels.sound, 16, '600', 120, 16);
     this.soundState = this.createText('', 13, '400', 120, 36);
+    this.textLabels = [title, resume, sound, this.soundState];
     this.resumeButton.view.addChild(resume);
     this.modalSoundButton.view.addChild(sound, this.soundState);
     this.placeButton(this.resumeButton, { x: 24, y: 66, width: 240, height: 44 });
@@ -163,6 +173,16 @@ export class PixiGameMenu {
     this.placeIcon(this.menuIcon, this.menuButton.area);
     this.placeIcon(this.soundIcon, this.soundButton.area);
     if (this.root.visible) this.options.onVisualChange?.();
+  }
+
+  /** Sets the rasterization tier for the popup labels in menu space. */
+  setTextResolution(resolution: number): void {
+    if (this.destroyed) return;
+    const tier = pixiTextResolution(resolution);
+    if (tier === this.textResolution) return;
+    this.textResolution = tier;
+    for (const label of this.textLabels) label.resolution = tier;
+    if (this.open) this.options.onVisualChange?.();
   }
 
   blocksPointer(x: number, y: number): boolean {

@@ -43,6 +43,25 @@ When checkout reports `completed`, the provider returned a matching receipt. Whe
 
 The optional `@playbridge/pixi` package provides PixiJS v8 Menu and Sound buttons and a gameplay popup. Start with the [cross-game adoption guide](docs/pixi-menu.md) for installation, game hooks, input ownership, and verification.
 
+## Pixi text density
+
+Use `pixiTextResolution(renderer.resolution, displayScale)` for Pixi `Text`. Pass the renderer's actual resolution because adaptive quality or a cap can make it differ from device DPR. Use the text layer's effective display scale. The helper rounds the product up to an integer from 1 to 4, following [Penguin Pop Party's text rasterization](https://github.com/mcorcosa/penguins/blob/5acfe531ac5ef6a6894ea5fb846db678d04d6f1c/src/presentation/PixiShell.ts#L214-L225). Higher tiers cost more texture memory, and the cap limits sharpness at extreme scales.
+
+The example uses a scaled HUD and an unscaled screen-space menu. For a scaled menu, pass its own display scale when calculating the tier for `setTextResolution()`.
+
+```js
+import { pixiTextResolution } from '@playbridge/pixi';
+
+function syncTextDensity(renderer, hudScale, caption, menu) {
+  const tier = pixiTextResolution(renderer.resolution, hudScale);
+  if (caption.resolution !== tier) caption.resolution = tier;
+  menu.setTextResolution(pixiTextResolution(renderer.resolution));
+  return tier;
+}
+```
+
+Call `syncTextDensity(app.renderer, hudScale, caption, menu)` at initial layout and when layout scale or renderer resolution changes. Apply the current tier to each new label before its first render, for example `new Text({ text, resolution: tier })` for a label in that HUD. The helpers affect `Text` rasterization. Pixi `BitmapText`, sprites, geometry, and renderer quality keep their own settings.
+
 ## Localization
 
 Import `Localization` from `@playbridge/core`. Each game supplies its supported language tags, default language and translation lookup. Initialize one instance per game. Pass the device or browser language preferences in priority order and optionally provide a game-scoped preference store.

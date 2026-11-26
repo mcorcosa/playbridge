@@ -8,7 +8,7 @@ import {
   Text,
   updateRenderGroupTransforms,
 } from 'pixi.js';
-import { PixiGameMenu } from '../dist/index.js';
+import { PixiGameMenu, pixiTextResolution } from '../dist/index.js';
 
 const labels = {
   menu: 'Game menu',
@@ -102,6 +102,63 @@ function fixture(t, options = {}) {
     setOpenAllowed: (value) => { openAllowed = value; },
   };
 }
+
+function popupTextLabels(hit) {
+  const resume = hit(...resumePoint);
+  const sound = hit(...modalSoundPoint);
+  return [
+    resume.parent.children.find(child => child instanceof Text),
+    ...resume.children.filter(child => child instanceof Text),
+    ...sound.children.filter(child => child instanceof Text),
+  ];
+}
+
+test('text resolution tiers round up the physical display scale and stay within 1–4', () => {
+  assert.equal(pixiTextResolution(1), 1);
+  assert.equal(pixiTextResolution(1, 1.5), 2);
+  assert.equal(pixiTextResolution(1, 2), 2);
+  assert.equal(pixiTextResolution(1.5), 2);
+  assert.equal(pixiTextResolution(1.5, 1.5), 3);
+  assert.equal(pixiTextResolution(2, 1.5), 3);
+  assert.equal(pixiTextResolution(2, 0.4), 1);
+  assert.equal(pixiTextResolution(2, 2.5), 4);
+  assert.equal(pixiTextResolution(Number.MAX_VALUE, 2), 4);
+  for (const invalid of [NaN, Infinity, -Infinity, 0, -1]) {
+    assert.equal(pixiTextResolution(invalid, 2), 2);
+    assert.equal(pixiTextResolution(2, invalid), 2);
+  }
+});
+
+test('setting a text tier updates only popup labels and skips repeated tiers', (t) => {
+  const { menu, tap, hit, invalidations } = fixture(t);
+  const extraText = new Text({ text: 'Custom', resolution: 4, eventMode: 'none' });
+  menu.root.addChild(extraText);
+
+  const beforeOpen = invalidations();
+  menu.setTextResolution(1);
+  assert.equal(invalidations(), beforeOpen);
+  tap(menuPoint);
+  const texts = popupTextLabels(hit);
+  assert.deepEqual(texts.map(text => text.text), [labels.title, labels.resume, labels.sound, labels.soundOn]);
+  assert.ok(texts.every(text => text.resolution === 1));
+
+  const updates = texts.map(text => t.mock.method(text, 'onViewUpdate'));
+  const beforeChange = invalidations();
+  menu.setTextResolution(2.2);
+  assert.ok(texts.every(text => text.resolution === 3));
+  assert.ok(updates.every(update => update.mock.callCount() === 1));
+  assert.equal(extraText.resolution, 4);
+  assert.equal(invalidations(), beforeChange + 1);
+
+  menu.setTextResolution(3);
+  assert.ok(updates.every(update => update.mock.callCount() === 1));
+  assert.equal(invalidations(), beforeChange + 1);
+
+  menu.setTextResolution(1);
+  assert.ok(texts.every(text => text.resolution === 1));
+  assert.ok(updates.every(update => update.mock.callCount() === 2));
+  assert.equal(invalidations(), beforeChange + 2);
+});
 
 test('toolbar bounds are local and the popup recenters and shields the board', (t) => {
   const { menu, hit, tap, openChanges } = fixture(t);
@@ -239,14 +296,8 @@ test('long translated labels scale to the popup and the changed sound label is m
   };
   const { stage, tap, setEnabled, menu, hit } = fixture(t, { labels: localized });
   tap(menuPoint);
-  const sound = hit(...modalSoundPoint);
-  const resume = hit(...resumePoint);
-  const title = resume.parent.children.find(child => child instanceof Text);
-  const texts = [
-    title,
-    ...resume.children.filter(child => child instanceof Text),
-    ...sound.children.filter(child => child instanceof Text),
-  ];
+  const texts = popupTextLabels(hit);
+  const [title] = texts;
   const measureCount = new Map();
   for (const text of texts) {
     text.getLocalBounds = () => {
