@@ -2,9 +2,9 @@
   "name": "playbridge",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/core", "packages/web", "packages/testing", "packages/facebook", "packages/crazygames"],
+  "workspaces": ["packages/core", "packages/web", "packages/testing", "packages/facebook", "packages/crazygames", "packages/pixi"],
   "scripts": {
-    "build": "npm run build -w @playbridge/core && npm run build -w @playbridge/web && npm run build -w @playbridge/testing && npm run build -w @playbridge/facebook && npm run build -w @playbridge/crazygames",
+    "build": "npm run build -w @playbridge/core && npm run build -w @playbridge/web && npm run build -w @playbridge/testing && npm run build -w @playbridge/facebook && npm run build -w @playbridge/crazygames && npm run build -w @playbridge/pixi",
     "test": "node --test"
   },
   "devDependencies": {

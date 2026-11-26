@@ -39,6 +39,10 @@ The Facebook adapter forwards consented events to `FBInstant.logEvent` and conve
 
 When checkout reports `completed`, the provider returned a matching receipt. When it reports `pending`, the result may still settle. Both paths can consult inventory before activating a durable entitlement. The caller owns entitlement policy and player-facing copy. [Meta Instant Games lifecycle](https://developers.facebook.com/docs/games/instant-games/guides/lifecycle/)
 
+## Pixi gameplay menu
+
+The optional `@playbridge/pixi` package provides PixiJS v8 Menu and Sound buttons and a gameplay popup. Start with the [cross-game adoption guide](docs/pixi-menu.md) for installation, game hooks, input ownership, and verification.
+
 ## Localization
 
 Import `Localization` from `@playbridge/core`. Each game supplies its supported language tags, default language and translation lookup. Initialize one instance per game. Pass the device or browser language preferences in priority order and optionally provide a game-scoped preference store.
